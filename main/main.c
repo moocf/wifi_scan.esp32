@@ -7,9 +7,6 @@
 #include "macros.h"
 
 
-static const char *TAG = "wifi_scan";
-
-
 static esp_err_t nvs_init() {
   esp_err_t ret = nvs_flash_init();
   if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -21,38 +18,32 @@ static esp_err_t nvs_init() {
 }
 
 
-static void on(void* arg, esp_event_base_t base, int32_t id, void* data) {
-  if (base == WIFI_EVENT && id == WIFI_EVENT_SCAN_DONE) {
-    static uint16_t count = 32;
-    static wifi_ap_record_t records[32];
-    printf("scan done\n");
-    ERETV( esp_wifi_scan_get_ap_records(&count, records) );
-    printf("got ap records\n");
-    for(int i=0; i<count; i++) {
-      printf("%d. %s : %d\n", i, records[i].ssid, records[i].rssi);
-    }
-  }
-  if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-    esp_wifi_connect();
-  } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
-    esp_wifi_connect();
-  } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
-    ip_event_got_ip_t* event = (ip_event_got_ip_t*) data;
-    ESP_LOGI(TAG, "got ip: %s", ip4addr_ntoa(&event->ip_info.ip));
+static void on_wifi(void* arg, esp_event_base_t base, int32_t id, void* data) {
+  if (id != WIFI_EVENT_SCAN_DONE) return;
+  printf("- WiFi scan done (event)\n");
+  printf("- Get scanned AP records\n");
+  static uint16_t count = 32;
+  static wifi_ap_record_t records[32];
+  ERETV( esp_wifi_scan_get_ap_records(&count, records) );
+  for(int i=0; i<count; i++) {
+    printf("%d. %s : %d\n", i+1, records[i].ssid, records[i].rssi);
   }
 }
 
 
-/* Initialize Wi-Fi as sta and set scan method */
 static esp_err_t wifi_scan() {
+  printf("- Initialize TCP/IP adapter\n");
   tcpip_adapter_init();
+  printf("- Create default event loop\n");
   ERET( esp_event_loop_create_default() );
-
+  printf("- Initialize WiFi with default config\n");
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   ERET( esp_wifi_init(&cfg) );
-
-  ERET( esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &on, NULL) );
-  ERET( esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on, NULL) );
+  printf("- Register WiFi event handler\n");
+  ERET( esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &on_wifi, NULL) );
+  printf("- Set WiFi mode as station\n");
+  ERET( esp_wifi_set_mode(WIFI_MODE_STA) );
+  printf("- Set WiFi configuration\n");
   wifi_config_t wifi_config = {.sta = {
     .ssid = "",
     .password = "",
@@ -61,11 +52,10 @@ static esp_err_t wifi_scan() {
     .threshold.rssi = -127,
     .threshold.authmode = WIFI_AUTH_OPEN,
   }};
-  ERET( esp_wifi_set_mode(WIFI_MODE_STA) );
   ERET( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
-  printf("Jigglypuff\n");
+  printf("- Start WiFi\n");
   ERET( esp_wifi_start() );
-  printf("Jiggly\n");
+  printf("- Start WiFi AP scan\n");
   wifi_scan_config_t sconfig = {
     .ssid = NULL,
     .bssid = NULL,
@@ -81,6 +71,7 @@ static esp_err_t wifi_scan() {
 
 
 void app_main() {
+  printf("- Initialize NVS\n");
   ESP_ERROR_CHECK( nvs_init() );
   ESP_ERROR_CHECK( wifi_scan() );
 }

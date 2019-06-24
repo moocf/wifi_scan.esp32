@@ -1,4 +1,5 @@
-Scan WiFi networks and log to serial port.
+Scan WiFi networks and log to serial port.<br>
+*why is static variable need to get AP records?*.
 
 ```text
 includePath:

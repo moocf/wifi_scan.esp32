@@ -10,6 +10,17 @@
 static const char *TAG = "wifi_scan";
 
 
+static esp_err_t nvs_init() {
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ERET( nvs_flash_erase() );
+    ERET( nvs_flash_init() );
+  }
+  ERET( ret );
+  return ESP_OK;
+}
+
+
 static void on(void* arg, esp_event_base_t base, int32_t id, void* data) {
   if (base == WIFI_EVENT && id == WIFI_EVENT_SCAN_DONE) {
     static uint16_t count = 32;
@@ -68,14 +79,8 @@ static esp_err_t wifi_scan() {
   return ESP_OK;
 }
 
-void app_main() {
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK( ret );
 
-    ESP_ERROR_CHECK( wifi_scan() );
+void app_main() {
+  ESP_ERROR_CHECK( nvs_init() );
+  ESP_ERROR_CHECK( wifi_scan() );
 }
